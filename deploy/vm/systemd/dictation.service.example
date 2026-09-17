@@ -1,0 +1,14 @@
+# Dictation is a static SPA served by nginx — no Node/systemd app process required.
+# This unit is optional documentation only; deploy.sh does not install it by default.
+#
+# [Unit]
+# Description=dictation (static site — managed by nginx)
+# Documentation=file:///opt/dictation/DEPLOYMENT.md
+#
+# [Service]
+# Type=oneshot
+# RemainAfterExit=yes
+# ExecStart=/bin/true
+#
+# [Install]
+# WantedBy=multi-user.target
