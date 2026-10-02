@@ -111,6 +111,8 @@ ensure_self_signed() {
   fi
   rm -f "${CERT_DIR}/fullchain.pem" "${CERT_DIR}/privkey.pem"
   make_self_signed_pem
+  # Readable by the non-root gateway user (UID 101) via the read-only mount.
+  chmod 644 "${CERT_DIR}/fullchain.pem" "${CERT_DIR}/privkey.pem" 2>/dev/null || true
   write_tls_source self-signed
   log "Wrote self-signed PEMs to ${CERT_DIR}"
 }
@@ -155,7 +157,7 @@ ensure_certbot() {
     "${COMPOSE[@]}" --profile certbot run --rm --entrypoint sh certbot -c \
       "cp -L /etc/letsencrypt/live/${DOMAIN}/fullchain.pem /out/fullchain.pem && \
        cp -L /etc/letsencrypt/live/${DOMAIN}/privkey.pem /out/privkey.pem && \
-       chmod 644 /out/fullchain.pem && chmod 600 /out/privkey.pem"
+       chmod 644 /out/fullchain.pem && chmod 644 /out/privkey.pem"
     write_tls_source letsencrypt
     log "Installed Let's Encrypt PEMs into ${CERT_DIR} (replaced prior gateway certs)"
   else

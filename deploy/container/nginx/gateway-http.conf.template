@@ -1,11 +1,12 @@
 # HTTP-only gateway — placeholders replaced by deploy.sh: __DOMAIN__
+# Non-root nginx: listens on 8080 inside the container; Compose maps host 80->8080.
 upstream dictation_app {
     server app:8080;
 }
 
 server {
-    listen 80;
-    listen [::]:80;
+    listen 8080;
+    listen [::]:8080;
     server_name __DOMAIN__;
 
     location ^~ /.well-known/acme-challenge/ {

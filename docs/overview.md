@@ -39,14 +39,15 @@ Dictation turns spoken audio into text inside the browser and keeps notes on the
 
 | File | Responsibility |
 |---|---|
-| `main.ts` | UI render, events, session orchestration |
+| `main.ts` | UI render, events, session orchestration, tab navigation (Dictation / Text to Speech) |
 | `speech.ts` | Continuous Web Speech recognition for mic mode |
 | `systemAudio.ts` | Open share or loopback streams; load Whisper; start transcription |
 | `streamTranscriber.ts` | Web Audio PCM tap, level meter, ~4s segments |
 | `transcribe.ts` | Whisper model select/load and inference |
 | `storage.ts` | Create / list / save / delete / export sessions |
 | `devices.ts` | Enumerate audio inputs/outputs; detect loopback-like devices |
-| `speaker.ts` | Speech Synthesis read-aloud |
+| `speaker.ts` | Speech Synthesis read-aloud (Speak); rate / pitch / voice options |
+| `synthesize.ts` | Local transformers.js TTS → WAV download; sentence chunking; model selection |
 | `languages.ts` | Language list and Whisper model size options |
 | `types.ts` | Shared TypeScript types |
 | `style.css` | Visual design |
@@ -76,6 +77,13 @@ Dictation turns spoken audio into text inside the browser and keeps notes on the
 2. Selects that device under **Loopback device**.  
 3. Same Whisper pipeline as share mode (PCM → Whisper → text).  
 4. Monitor-through-speakers is disabled in this mode to avoid feedback.
+
+### D. Text to Speech
+
+1. User opens the **Text to Speech** tab and pastes or uploads `.txt` text.  
+2. **Speak** → `SpeakerPlayback.speak()` plays audio via the browser Web Speech synthesis API (no file).  
+3. **Download audio (WAV)** → `synthesize.ts` chunks the text, runs a local transformers.js TTS model, encodes the samples to WAV, and triggers a file download.  
+4. The download model is chosen from the Hugging Face selector (default **Auto** by language).
 
 ## Runtime dependencies
 

@@ -25,6 +25,12 @@ Client ──► nginx FrontendGateway ──► static dictation assets
 
 There is no Node.js runtime in production; Vite builds static HTML/JS/WASM.
 
+Two in-browser features lazy-load models from **Hugging Face** on first use and
+then run locally: **Whisper** (system-audio dictation) and the **Text to Speech
+→ Download audio (WAV)** path (transformers.js MMS/VITS). Both rely on the
+COOP/COEP WASM headers the nginx templates already send; the client needs
+outbound HTTPS to Hugging Face to fetch a model the first time (cached after).
+
 ---
 
 ## Prerequisites
@@ -46,7 +52,8 @@ There is no Node.js runtime in production; Vite builds static HTML/JS/WASM.
 ### Container
 
 - Docker Engine + `docker compose`
-- Ability to publish host ports 80/443
+- Ability to publish host ports 80/443 (via the Docker daemon — the container
+  processes themselves run **non-root**; see [Rootless / non-root](#rootless--non-root-docker))
 - Does **not** require or modify host nginx
 
 ---
@@ -190,17 +197,62 @@ Preserves `deploy/container/.env.production` across runs.
 
 ### Compose services
 
-| Service | Role | Published ports |
-|---|---|---|
-| `app` | Static nginx on `:8080` (internal only) | none |
-| `gateway` | FrontendGateway TLS/HTTP | `80`, `443` |
-| `certbot` | Profile `certbot` only | none |
+| Service | Role | Container user | Internal listen | Published ports |
+|---|---|---|---|---|
+| `app` | Static SPA (`nginxinc/nginx-unprivileged`) | non-root (UID 101) | `8080` | none (internal only) |
+| `gateway` | FrontendGateway TLS/HTTP (`nginxinc/nginx-unprivileged`) | non-root (UID 101) | `8080` / `8443` | host `80→8080`, `443→8443` |
+| `certbot` | Profile `certbot` only | root (short-lived) | — | none |
+
+Both long-running services run as a **non-root** user. The gateway listens on
+unprivileged ports **8080/8443** inside the container; Docker maps the host's
+`80`/`443` onto them, so no process binds a privileged port.
 
 ### What this deploy will NOT touch
 
 - Host `/etc/nginx/nginx.conf` or `sites-enabled`
 - Unrelated Docker Compose projects
 - Host systemd units
+
+### Rootless / non-root Docker
+
+The container images and the deploy script do **not** require `sudo`.
+
+**Inside the containers (always non-root):** both `app` and `gateway` use
+`nginxinc/nginx-unprivileged` and run as UID **101**. The gateway listens on
+**8080/8443**; Compose maps host `80→8080` and `443→8443`. Certificate PEMs are
+written world-readable (`644`) so the non-root nginx user can read them through
+the read-only `:ro` mount.
+
+**On the host — avoid `sudo` with one of:**
+
+1. **Add your user to the `docker` group** (talk to the daemon without `sudo`):
+
+   ```bash
+   sudo usermod -aG docker "$USER"   # one-time, by an admin
+   newgrp docker                     # or log out/in
+   ./deploy/container/deploy.sh --domain dictation.example.com --no-tls
+   ```
+
+   > Note: membership in the `docker` group is root-equivalent on that host.
+
+2. **Rootless Docker** (daemon runs as your user; strongest isolation):
+
+   ```bash
+   dockerd-rootless-setuptool.sh install
+   export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+   ```
+
+   Rootless mode binds privileged ports (80/443) by default only if
+   `net.ipv4.ip_unprivileged_port_start` allows it, or via the built-in
+   `rootlesskit` port driver. If binding 80/443 fails, publish high ports and
+   front them (e.g. `8080:8080`, `8443:8443`) or grant the capability:
+
+   ```bash
+   sudo setcap cap_net_bind_service=ep "$(which rootlesskit)"
+   ```
+
+The VM path still needs root/sudo because it edits host nginx (`sites-available`,
+`/etc/nginx/ssl`, reload). Use the **Container** path for a no-root deployment.
 
 ---
 
@@ -273,6 +325,19 @@ cat certs/.tls-source
 ```bash
 ./deploy/validate.sh --base http://dictation.example.com
 ./deploy/validate.sh --base https://dictation.example.com --insecure
+
+# Assert the containers run as a non-root user (UID != 0). Requires Docker;
+# run from the host where the Compose project is up.
+./deploy/validate.sh --check-nonroot
+./deploy/validate.sh --base http://127.0.0.1 --check-nonroot   # both checks
+```
+
+`--check-nonroot` runs `docker compose exec <svc> id -u` for `app` and
+`gateway` and fails if either reports UID `0`. Expected output:
+
+```text
+OK   app: non-root (UID 101)
+OK   gateway: non-root (UID 101)
 ```
 
 ### Rollback
@@ -290,7 +355,8 @@ cat certs/.tls-source
 | Certbot fails | DNS not pointing here / port 80 blocked | Fix DNS/firewall; retry `--certbot` or use `--self-signed` |
 | Browser mic blocked | Not HTTPS (or not localhost) | Use `--self-signed`/`--certbot` or tunnel |
 | Container 443 empty | Still on `--no-tls` | Redeploy with `--self-signed` or `--certbot` |
-| Whisper WASM issues | Missing COOP/COEP | Templates already set headers; hard-refresh |
+| Whisper / TTS WASM issues | Missing COOP/COEP | Templates already set headers (incl. `.wasm`); hard-refresh |
+| Model download fails (Whisper or TTS WAV) | Blocked egress to Hugging Face | Allow outbound HTTPS to `huggingface.co` / `cdn-lfs*`; retry |
 
 ---
 

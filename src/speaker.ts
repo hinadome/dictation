@@ -37,6 +37,14 @@ export function whenVoicesReady(): Promise<SpeakerVoice[]> {
   })
 }
 
+export interface SpeakOptions {
+  voiceId?: string
+  rate?: number
+  pitch?: number
+  onDone?: () => void
+  onError?: (message: string) => void
+}
+
 export class SpeakerPlayback {
   private speaking = false
 
@@ -44,20 +52,24 @@ export class SpeakerPlayback {
     return this.speaking
   }
 
-  speak(text: string, voiceId?: string): void {
+  speak(text: string, options: string | SpeakOptions = {}): void {
     const synthesis = getSynthesis()
     if (!synthesis) return
 
     const trimmed = text.trim()
     if (!trimmed) return
 
+    const opts: SpeakOptions = typeof options === 'string' ? { voiceId: options } : options
+
     this.stop()
     const utterance = new SpeechSynthesisUtterance(trimmed)
-    utterance.rate = 1
-    utterance.pitch = 1
+    utterance.rate = clamp(opts.rate ?? 1, 0.5, 2)
+    utterance.pitch = clamp(opts.pitch ?? 1, 0, 2)
 
-    if (voiceId) {
-      const match = synthesis.getVoices().find((voice) => `${voice.name}::${voice.lang}` === voiceId)
+    if (opts.voiceId) {
+      const match = synthesis
+        .getVoices()
+        .find((voice) => `${voice.name}::${voice.lang}` === opts.voiceId)
       if (match) utterance.voice = match
     }
 
@@ -66,9 +78,15 @@ export class SpeakerPlayback {
     }
     utterance.onend = () => {
       this.speaking = false
+      opts.onDone?.()
     }
-    utterance.onerror = () => {
+    utterance.onerror = (event) => {
       this.speaking = false
+      // 'canceled'/'interrupted' happen on normal stop(); don't surface them.
+      if (event.error && event.error !== 'canceled' && event.error !== 'interrupted') {
+        opts.onError?.(event.error)
+      }
+      opts.onDone?.()
     }
 
     synthesis.speak(utterance)
@@ -80,4 +98,9 @@ export class SpeakerPlayback {
     synthesis.cancel()
     this.speaking = false
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min
+  return Math.min(max, Math.max(min, value))
 }

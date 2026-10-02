@@ -15,12 +15,13 @@ services:
     restart: unless-stopped
 
   gateway:
-    image: nginx:1.27-alpine
+    image: nginxinc/nginx-unprivileged:1.27-alpine
     depends_on:
       - app
+    # Container listens on non-root 8080/8443; host still serves 80/443.
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:8080"
+      - "443:8443"
     volumes:
       - ./nginx/gateway.active.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/ssl:ro
