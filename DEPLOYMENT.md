@@ -207,6 +207,9 @@ Both long-running services run as a **non-root** user. The gateway listens on
 unprivileged ports **8080/8443** inside the container; Docker maps the host's
 `80`/`443` onto them, so no process binds a privileged port.
 
+Both pin the image **`nginxinc/nginx-unprivileged:1.27.0-alpine3.19-slim`** for
+reproducible builds.
+
 ### What this deploy will NOT touch
 
 - Host `/etc/nginx/nginx.conf` or `sites-enabled`

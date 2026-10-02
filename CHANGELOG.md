@@ -42,6 +42,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Container deploy now runs non-root**: `app` and `gateway` use
   `nginxinc/nginx-unprivileged` (UID 101); gateway listens on `8080`/`8443`
   inside the container, with Compose mapping host `80→8080` and `443→8443`
+- Pinned the container image to `nginxinc/nginx-unprivileged:1.27.0-alpine3.19-slim`
+  (app + gateway) for reproducible builds
 - Certificate PEMs written world-readable (`644`) so the non-root nginx user can
   read them through the read-only mount (self-signed and Certbot paths)
 - `DEPLOYMENT.md`: added a **Rootless / non-root Docker** section (docker-group

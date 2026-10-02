@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   gateway:
-    image: nginxinc/nginx-unprivileged:1.27-alpine
+    image: nginxinc/nginx-unprivileged:1.27.0-alpine3.19-slim
     depends_on:
       - app
     # Container listens on non-root 8080/8443; host still serves 80/443.

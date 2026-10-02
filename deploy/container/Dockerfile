@@ -10,7 +10,7 @@ RUN npm run build
 
 # Non-root runtime: nginxinc/nginx-unprivileged runs as UID 101 and listens on
 # 8080 by default (no root needed inside the container).
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS app
+FROM nginxinc/nginx-unprivileged:1.27.0-alpine3.19-slim AS app
 COPY deploy/container/nginx/app.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080
